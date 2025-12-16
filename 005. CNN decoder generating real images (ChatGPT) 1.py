@@ -289,4 +289,4 @@ print("Training complete.")
 print("Final output shape:", fake.shape)
 
 #MY COMMENTS
-#I added the correct path for images, changed the images to jpg format (png can save the 4th alpha channel that I don't need, jpg can't). The learning doesn't move the model anywhere during 136 epochs, 0.01 learning rate. Need to try 0.1 learning rate or higher, because the loss just dnaces around ~0.83566.
+#I added the correct path for images, changed the images to jpg format (png can save the 4th alpha channel that I don't need, jpg can't). The learning doesn't move the model anywhere during 136 epochs, 0.01 learning rate. Need to try 0.1 learning rate or higher, because the loss just dances around ~0.83566.
