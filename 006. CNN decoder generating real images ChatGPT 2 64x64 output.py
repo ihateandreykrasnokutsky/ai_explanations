@@ -12,13 +12,14 @@
 
 import numpy as np
 from skimage import io, transform
+from datetime import datetime
 
 # -----------------------------
 # Hyperparameters
 # -----------------------------
 epochs = 10000
 latent_dim = 10
-learning_rate = 0.9
+learning_rate = 1
 target_size = (64, 64)  # final generated image size
 
 # -----------------------------
@@ -41,7 +42,7 @@ def save_image(tensor_img, path):
 
     io.imsave(path, img)
 
-def load_image(path, target_size=(32, 32)):
+def load_image(path, target_size):
     """
     Loads an image, resizes it to target_size,
     normalizes it to [-1, 1] so it matches tanh output.
@@ -159,18 +160,19 @@ class CNNGenerator:
         Initialize weights.
         We create:
           - FC weight: latent_dim -> 256*4*4
-          - Three transpose-convs:
-                256 -> 128
+          - 4 transpose-convs:
+                256 -> 128 channels (layers)
                 128 -> 64
-                 64 -> 3  (RGB)
+                 64 -> 32  
+                 64 -> 3 (RGB)
         """
         self.latent_dim = latent_dim
         self.fc_weight = np.random.randn(latent_dim, 256*4*4) * 0.02
 
         self.ct1_weight = np.random.randn(256, 128, 4, 4) * 0.02
         self.ct2_weight = np.random.randn(128, 64, 4, 4) * 0.02
-        self.ct3_weight = np.random.randn(64, 3, 4, 4) * 0.02
-        self.ct4_weight = np.random.randn(3, 3, 4, 4) * 0.02
+        self.ct3_weight = np.random.randn(64, 32, 4, 4) * 0.02
+        self.ct4_weight = np.random.randn(32, 3, 4, 4) * 0.02
 
     # -----------------------------
     # FORWARD PASS
@@ -195,7 +197,11 @@ class CNNGenerator:
 
         # Third
         self.y3 = conv_transpose2d_forward(self.y2_relu, self.ct3_weight)
-        self.out = tanh(self.y3)
+        self.y3_relu=relu(self.y3)
+
+        #Fourth
+        self.y4=conv_transpose2d_forward(self.y3_relu, self.ct4_weight)
+        self.out = tanh(self.y4)
 
         return self.out
 
@@ -208,7 +214,15 @@ class CNNGenerator:
         """
 
         # Tanh layer
-        grad_y3 = grad_out * tanh_grad(self.y3)
+        grad_y4 = grad_out * tanh_grad(self.y4)
+
+        # ConvTranspose4
+        grad_y3_relu, grad_ct4 = conv_transpose2d_backward(
+            self.y3_relu, self.ct4_weight, grad_y4
+        )
+
+        # ReLU3
+        grad_y3 = grad_y3_relu * relu_grad(self.y3)
 
         # ConvTranspose3
         grad_y2_relu, grad_ct3 = conv_transpose2d_backward(
@@ -235,18 +249,19 @@ class CNNGenerator:
         grad_fc = grad_x1.reshape(256*4*4)
         grad_fc_w = np.outer(self.z, grad_fc)
 
-        return grad_ct1, grad_ct2, grad_ct3, grad_fc_w
+        return grad_ct1, grad_ct2, grad_ct3, grad_ct4, grad_fc_w
 
     # -----------------------------
     # Update weights
     # -----------------------------
     def step(self, grads):
-        grad_ct1, grad_ct2, grad_ct3, grad_fc = grads
+        grad_ct1, grad_ct2, grad_ct3, grad_ct4, grad_fc = grads
 
         # Gradient descent
         self.ct1_weight -= learning_rate * grad_ct1
         self.ct2_weight -= learning_rate * grad_ct2
         self.ct3_weight -= learning_rate * grad_ct3
+        self.ct4_weight -= learning_rate * grad_ct4
         self.fc_weight  -= learning_rate * grad_fc
 
 
@@ -279,16 +294,17 @@ for epoch in range(epochs):
 
     # print & save images
     if epoch % 1 == 0:
-        print(f"Epoch {epoch}, Loss = {loss:.5f}")
+        print(f"Epoch {epoch}, Loss = {loss:.5f}, Learning Rate = {learning_rate}")
 
     # save every 5 epochs
     if epoch % 1 == 0:
         out_path = f'./neural_networks_python/015-CNN-generator-data/generated_epoch_{epoch}.jpg'
         save_image(fake, out_path)
-        print(f"Saved image for epoch {epoch} -> {out_path}")
+        print(f"[{datetime.now().strftime('%H:%M:%S')}]: Saved image for epoch {epoch} -> {out_path}")
 
 print("Training complete.")
 print("Final output shape:", fake.shape)
 
-#MY COMMENTS
-#I added the correct path for images, changed the images to jpg format (png can save the 4th alpha channel that I don't need, jpg can't). The learning doesn't move the model anywhere during 136 epochs, 0.01 learning rate. Need to try 0.1 learning rate or higher, because the loss just dances around ~0.83566.
+# MY COMMENTS
+# I added the correct path for images, changed the images to jpg format (png can save the 4th alpha channel that I don't need, jpg can't). The learning doesn't move the model anywhere during 136 epochs, 0.01 learning rate. Need to try 0.1 learning rate or higher, because the loss just dances around ~0.83566.
+# Now the point is to make it produce 64x64 images. Given that I didn't write and didn't understand the program fully, it won't be easy. But it's good enough idea to try.
