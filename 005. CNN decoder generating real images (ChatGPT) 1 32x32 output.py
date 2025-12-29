@@ -18,7 +18,7 @@ from skimage import io, transform
 # -----------------------------
 epochs = 10000
 latent_dim = 10
-learning_rate = 0.1
+learning_rate = 0.9
 target_size = (32, 32)  # final generated image size
 
 # -----------------------------
@@ -257,9 +257,10 @@ target_img = load_image('./neural_networks_python/015-CNN-generator-data/cat_0.j
 
 gen = CNNGenerator()
 
+# random noise (I moved it outside of the "for" loop, because the randomly infinitely changing input messes up with the gradients a lot, making the task impossible)
+z = np.random.randn(latent_dim).astype(np.float32)
+
 for epoch in range(epochs):
-    # random noise
-    z = np.random.randn(latent_dim).astype(np.float32)
 
     # forward pass
     fake = gen.forward(z)
